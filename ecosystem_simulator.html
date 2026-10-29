@@ -1,0 +1,2473 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>🌿 나만의 작은 생태계 균형 시뮬레이터</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Pretendard Font -->
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Pretendard', 'system-ui', '-apple-system', 'sans-serif'],
+          },
+          colors: {
+            grass: {
+              DEFAULT: '#22c55e',
+              dark: '#15803d',
+              light: '#86efac'
+            },
+            rabbit: {
+              DEFAULT: '#3b82f6',
+              dark: '#1d4ed8',
+              light: '#93c5fd'
+            },
+            fox: {
+              DEFAULT: '#f97316',
+              dark: '#c2410c',
+              light: '#fdba74'
+            }
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    /* 커스텀 스크롤바 & 터치 조작 최적화 */
+    * {
+      touch-action: manipulation;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    input[type=range] {
+      accent-color: #10b981;
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(0,0,0,0.05);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(0,0,0,0.2);
+      border-radius: 4px;
+    }
+    @keyframes pulse-subtle {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.04); }
+    }
+    .animate-pulse-subtle {
+      animation: pulse-subtle 2s infinite ease-in-out;
+    }
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-4px); }
+      40%, 80% { transform: translateX(4px); }
+    }
+    .shake-alert {
+      animation: shake 0.5s infinite;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 h-screen w-screen overflow-hidden flex flex-col font-sans select-none">
+
+  <!-- ========================================== -->
+  <!-- 1. 상단 글로벌 네비게이션 헤더 -->
+  <!-- ========================================== -->
+  <header class="h-14 bg-white/90 backdrop-blur border-b border-slate-200 px-4 flex items-center justify-between shrink-0 shadow-sm z-20">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center text-white shadow-md text-xl">
+        🌿
+      </div>
+      <div>
+        <h1 class="text-base md:text-lg font-bold text-slate-800 leading-tight flex items-center gap-2">
+          나만의 작은 생태계 균형 시뮬레이터
+          <span class="text-xs bg-emerald-100 text-emerald-800 font-semibold px-2 py-0.5 rounded-full border border-emerald-300 hidden sm:inline-flex items-center">
+            초등 5~6 과학
+          </span>
+        </h1>
+        <p class="text-[11px] text-slate-500 hidden md:block">먹이그물과 에너지 흐름에 따른 생태계 평형의 동적 균형 탐구</p>
+      </div>
+    </div>
+
+    <!-- 실시간 개체수 대시 요약 뱃지 -->
+    <div class="hidden lg:flex items-center gap-2">
+      <div class="flex items-center gap-1.5 px-3 py-1 bg-emerald-50 border border-emerald-200 rounded-lg text-xs font-semibold text-emerald-700 shadow-sm">
+        <span>🌱 생산자(풀):</span>
+        <span id="badge-grass-count" class="font-bold text-sm w-7 text-right">0</span>
+      </div>
+      <div class="flex items-center gap-1.5 px-3 py-1 bg-blue-50 border border-blue-200 rounded-lg text-xs font-semibold text-blue-700 shadow-sm">
+        <span>🐇 1차(토끼):</span>
+        <span id="badge-rabbit-count" class="font-bold text-sm w-7 text-right">0</span>
+      </div>
+      <div class="flex items-center gap-1.5 px-3 py-1 bg-amber-50 border border-amber-200 rounded-lg text-xs font-semibold text-amber-700 shadow-sm">
+        <span>🦊 2차(여우):</span>
+        <span id="badge-fox-count" class="font-bold text-sm w-7 text-right">0</span>
+      </div>
+    </div>
+
+    <!-- 시뮬레이션 제어 버튼군 -->
+    <div class="flex items-center gap-1.5 md:gap-2">
+      <!-- 시뮬레이션 시간 표시 -->
+      <div class="px-2.5 py-1 bg-slate-100 rounded-lg text-xs font-medium text-slate-600 border border-slate-200 flex items-center gap-1">
+        <span>⏱️</span>
+        <span id="sim-timer-text" class="font-mono font-bold text-slate-800">00:00</span>
+        <span class="text-[10px] text-slate-400">|</span>
+        <span id="sim-day-text" class="text-xs font-semibold text-emerald-600">1일차</span>
+      </div>
+
+      <!-- 재생 / 일시정지 -->
+      <button id="btn-pause-play" class="w-8 h-8 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white flex items-center justify-center transition shadow-sm font-bold text-sm" title="일시정지/재생 (스페이스바)">
+        ⏸️
+      </button>
+
+      <!-- 배속 선택기 -->
+      <div class="flex bg-slate-200 p-0.5 rounded-lg border border-slate-300 text-xs font-semibold">
+        <button data-speed="0.5" class="btn-speed px-2 py-0.5 rounded text-slate-600 hover:text-slate-900 transition">0.5x</button>
+        <button data-speed="1" class="btn-speed px-2 py-0.5 rounded bg-white text-emerald-700 shadow-sm transition">1x</button>
+        <button data-speed="2" class="btn-speed px-2 py-0.5 rounded text-slate-600 hover:text-slate-900 transition">2x</button>
+        <button data-speed="4" class="btn-speed px-2 py-0.5 rounded text-slate-600 hover:text-slate-900 transition">4x</button>
+      </div>
+
+      <!-- 사운드 토글 -->
+      <button id="btn-sound-toggle" class="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 flex items-center justify-center text-sm transition" title="효과음 켜기/끄기">
+        🔊
+      </button>
+
+      <!-- 초기화 버튼 -->
+      <button id="btn-reset-world" class="w-8 h-8 rounded-lg bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 flex items-center justify-center text-sm transition active:scale-95" title="생태계 초기화">
+        🔄
+      </button>
+
+      <!-- 가이드 / 학습도움 모달 버튼 -->
+      <button id="btn-open-help" class="w-8 h-8 rounded-lg bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-600 flex items-center justify-center text-sm font-bold transition" title="학습 도움말 및 가이드">
+        ❓
+      </button>
+    </div>
+  </header>
+
+  <!-- ========================================== -->
+  <!-- 2. 메인 바디 영역 (좌: 캔버스 65%, 우: 대시보드 35%) -->
+  <!-- ========================================== -->
+  <main class="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
+
+    <!-- [좌측 영역: 메인 생태계 시뮬레이터 월드 캔버스] -->
+    <section class="flex-1 lg:w-[65%] flex flex-col relative h-[55vh] lg:h-full bg-slate-900 overflow-hidden">
+      
+      <!-- 상단 오버레이 도구 모음 (생물 브러시 & 돋보기 모드) -->
+      <div class="absolute top-3 left-3 right-3 z-10 flex flex-wrap items-center justify-between pointer-events-none gap-2">
+        <!-- 인터랙션 브러시 바 -->
+        <div class="pointer-events-auto bg-white/95 backdrop-blur-md px-2 py-1.5 rounded-2xl shadow-lg border border-slate-200/80 flex items-center gap-1">
+          <span class="text-xs font-bold text-slate-500 px-2 flex items-center gap-1">
+            <span>🖐️</span> 도구:
+          </span>
+          <button data-brush="select" class="btn-brush active px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition bg-emerald-600 text-white shadow-sm">
+            <span>🔍</span> 관찰·추적
+          </button>
+          <button data-brush="grass" class="btn-brush px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition text-emerald-700 hover:bg-emerald-50">
+            <span>🌱</span> 풀 심기
+          </button>
+          <button data-brush="rabbit" class="btn-brush px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition text-blue-700 hover:bg-blue-50">
+            <span>🐇</span> 토끼 놓기
+          </button>
+          <button data-brush="fox" class="btn-brush px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition text-amber-700 hover:bg-amber-50">
+            <span>🦊</span> 여우 놓기
+          </button>
+          <button data-brush="erase" class="btn-brush px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition text-rose-700 hover:bg-rose-50">
+            <span>🧹</span> 지우개
+          </button>
+        </div>
+
+        <!-- 환경 재해 / 긴급 이벤트 즉시 트리거 버튼군 -->
+        <div class="pointer-events-auto bg-white/95 backdrop-blur-md px-2.5 py-1.5 rounded-2xl shadow-lg border border-slate-200/80 flex items-center gap-1.5">
+          <button id="btn-trigger-drought" class="px-2.5 py-1 rounded-xl text-xs font-bold bg-amber-100 hover:bg-amber-200 text-amber-800 transition flex items-center gap-1 active:scale-95" title="풀의 성장이 급감하고 시듭니다">
+            ☀️ 가뭄 발생
+          </button>
+          <button id="btn-trigger-rain" class="px-2.5 py-1 rounded-xl text-xs font-bold bg-sky-100 hover:bg-sky-200 text-sky-800 transition flex items-center gap-1 active:scale-95" title="풀이 빠르게 번식합니다">
+            🌧️ 단비 내리기
+          </button>
+          <button id="btn-trigger-plague" class="px-2.5 py-1 rounded-xl text-xs font-bold bg-purple-100 hover:bg-purple-200 text-purple-800 transition flex items-center gap-1 active:scale-95" title="여우를 모두 사냥해 제거합니다 (카이바브 고원 실험)">
+            🏹 늑대/여우 포획
+          </button>
+        </div>
+      </div>
+
+      <!-- 월드 캔버스 자체 -->
+      <canvas id="world-canvas" class="w-full h-full block cursor-crosshair"></canvas>
+
+      <!-- 선택 개체 상세 정보 HUD (개체 클릭 시 노출) -->
+      <div id="inspector-hud" class="absolute bottom-4 left-4 z-10 bg-slate-900/90 backdrop-blur-md text-white border border-slate-700/80 rounded-2xl p-3 shadow-2xl max-w-xs text-xs hidden transition-all duration-200">
+        <div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-700">
+          <div class="flex items-center gap-2">
+            <span id="hud-icon" class="text-xl">🐇</span>
+            <div>
+              <div id="hud-name" class="font-bold text-sm text-slate-100">초원토끼 #42</div>
+              <div id="hud-state" class="text-[10px] text-emerald-400 font-semibold">풀 뜯는 중</div>
+            </div>
+          </div>
+          <button id="hud-close" class="text-slate-400 hover:text-white px-1.5 py-0.5 rounded hover:bg-slate-800 text-sm">✕</button>
+        </div>
+        <div class="space-y-1.5 text-slate-300">
+          <div class="flex justify-between items-center">
+            <span>남은 에너지:</span>
+            <div class="w-28 bg-slate-800 rounded-full h-2.5 overflow-hidden border border-slate-700">
+              <div id="hud-energy-bar" class="bg-emerald-500 h-full rounded-full transition-all duration-150" style="width: 75%"></div>
+            </div>
+          </div>
+          <div class="flex justify-between">
+            <span>생존 시간 / 수명:</span>
+            <span id="hud-age" class="font-mono text-slate-200">14.2초 / 45.0초</span>
+          </div>
+          <div class="flex justify-between">
+            <span>이동 속도:</span>
+            <span id="hud-speed" class="font-mono text-slate-200">1.8 px/f</span>
+          </div>
+          <div class="flex justify-between">
+            <span>번식 횟수:</span>
+            <span id="hud-offspring" class="font-mono text-slate-200">1마리 탄생시킴</span>
+          </div>
+        </div>
+        <div class="mt-2.5 pt-2 border-t border-slate-800 text-[10px] text-slate-400 flex items-center justify-between">
+          <span>🎯 시야 반경(FOV) 표시 중</span>
+          <button id="hud-remove-btn" class="text-rose-400 hover:text-rose-300 underline font-semibold">개체 삭제</button>
+        </div>
+      </div>
+
+      <!-- 월드 하단 상태 툴팁 안내 -->
+      <div class="absolute bottom-3 right-3 z-10 pointer-events-none">
+        <div class="bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-xl text-[11px] text-slate-300 flex items-center gap-2 border border-white/10">
+          <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+          <span>드래그하여 생물 배치 · 개체를 클릭하여 추적 카메라 실행</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- [우측 영역: 실시간 데이터 대시보드 & 환경 컨트롤 & 탐구 미션] -->
+    <aside class="flex-1 lg:w-[35%] flex flex-col bg-white border-t lg:border-t-0 lg:border-l border-slate-200 shadow-xl overflow-hidden z-10">
+
+      <!-- 대시보드 상단 탭 (시계열 꺾은선 그래프 / 생태계 피라미드) -->
+      <div class="border-b border-slate-200 bg-slate-50/70 p-2 flex items-center justify-between shrink-0">
+        <div class="flex bg-slate-200/80 p-0.5 rounded-xl text-xs font-bold w-full">
+          <button id="tab-btn-chart" class="flex-1 py-1.5 rounded-lg bg-white text-slate-800 shadow-sm flex items-center justify-center gap-1.5 transition">
+            <span>📈</span> 개체 수 변화 곡선
+          </button>
+          <button id="tab-btn-pyramid" class="flex-1 py-1.5 rounded-lg text-slate-600 hover:text-slate-800 flex items-center justify-center gap-1.5 transition">
+            <span>🔺</span> 생태계 피라미드
+          </button>
+        </div>
+      </div>
+
+      <!-- 상단 시각화 차트 뷰 컨테이너 (고정 높이) -->
+      <div class="h-44 sm:h-48 border-b border-slate-200 relative bg-slate-900 p-2 shrink-0">
+        <!-- 꺾은선 그래프 뷰 -->
+        <div id="chart-view" class="w-full h-full relative flex flex-col">
+          <div class="flex items-center justify-between text-[11px] font-bold text-slate-400 px-1 mb-1">
+            <span class="flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span>생산자(풀)
+              <span class="w-2 h-2 rounded-full bg-blue-400 inline-block ml-1"></span>1차(토끼)
+              <span class="w-2 h-2 rounded-full bg-amber-400 inline-block ml-1"></span>2차(여우)
+            </span>
+            <span id="chart-scale-label" class="text-slate-500 font-mono text-[10px]">최대치: 250</span>
+          </div>
+          <div class="flex-1 relative overflow-hidden">
+            <canvas id="chart-canvas" class="w-full h-full block"></canvas>
+            <!-- 이벤트 마커 라벨 컨테이너 -->
+            <div id="chart-event-tag" class="absolute top-1 right-2 text-[10px] font-bold bg-amber-500/90 text-white px-2 py-0.5 rounded shadow hidden"></div>
+          </div>
+        </div>
+
+        <!-- 생태계 피라미드 뷰 -->
+        <div id="pyramid-view" class="w-full h-full relative hidden flex-col justify-center items-center py-1">
+          <canvas id="pyramid-canvas" class="w-full h-full block"></canvas>
+          <div id="pyramid-warning" class="absolute top-2 right-2 text-[11px] font-bold px-2 py-0.5 rounded-lg bg-rose-500/90 text-white shadow hidden shake-alert">
+            ⚠️ 생태계 불균형!
+          </div>
+        </div>
+      </div>
+
+      <!-- 하단 스크롤 영역: 환경 변수 조절 패널 & 3대 탐구 미션 -->
+      <div class="flex-1 overflow-y-auto p-4 space-y-4">
+
+        <!-- 1. 환경 및 생태계 파라미터 조절기 -->
+        <div class="bg-slate-50 border border-slate-200/90 rounded-2xl p-3.5 shadow-sm">
+          <div class="flex items-center justify-between mb-2.5">
+            <h2 class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+              <span>🎛️</span> 환경 조건 및 생태 균형 제어
+            </h2>
+            <button id="btn-reset-params" class="text-[11px] text-slate-500 hover:text-emerald-600 underline font-medium">
+              기본값 복원
+            </button>
+          </div>
+
+          <div class="space-y-3">
+            <!-- 일조량 & 수분 (풀 성장 속도) -->
+            <div>
+              <div class="flex justify-between text-xs font-semibold text-slate-600 mb-1">
+                <span class="flex items-center gap-1">☀️ 일조량 및 강수량 (풀 성장률)</span>
+                <span id="label-sunlight" class="font-mono text-emerald-600">보통 (1.0x)</span>
+              </div>
+              <input type="range" id="param-sunlight" min="0.1" max="2.5" step="0.1" value="1.0" class="w-full h-1.5 bg-slate-200 rounded-lg cursor-pointer">
+              <div class="flex justify-between text-[10px] text-slate-400 mt-0.5">
+                <span>사막화/가뭄</span>
+                <span>보통</span>
+                <span>비옥한 우림</span>
+              </div>
+            </div>
+
+            <!-- 풀 최대 수용량 (환경 수용 한계 K) -->
+            <div>
+              <div class="flex justify-between text-xs font-semibold text-slate-600 mb-1">
+                <span class="flex items-center gap-1">🌾 최대 풀 번식 한계 (환경용량 K)</span>
+                <span id="label-max-grass" class="font-mono text-emerald-600">240개</span>
+              </div>
+              <input type="range" id="param-max-grass" min="50" max="400" step="10" value="240" class="w-full h-1.5 bg-slate-200 rounded-lg cursor-pointer">
+            </div>
+
+            <!-- 토끼 신진대사율 (배고픔 속도) -->
+            <div>
+              <div class="flex justify-between text-xs font-semibold text-slate-600 mb-1">
+                <span class="flex items-center gap-1">🐇 토끼의 에너지 소비율</span>
+                <span id="label-rabbit-metabolism" class="font-mono text-blue-600">표준 (1.0x)</span>
+              </div>
+              <input type="range" id="param-rabbit-metabolism" min="0.5" max="2.0" step="0.1" value="1.0" class="w-full h-1.5 bg-slate-200 rounded-lg cursor-pointer">
+            </div>
+
+            <!-- 여우 사냥 민첩성 -->
+            <div>
+              <div class="flex justify-between text-xs font-semibold text-slate-600 mb-1">
+                <span class="flex items-center gap-1">🦊 여우의 최고 추격 속력</span>
+                <span id="label-fox-speed" class="font-mono text-amber-600">표준 (2.6 px/f)</span>
+              </div>
+              <input type="range" id="param-fox-speed" min="1.8" max="3.6" step="0.1" value="2.6" class="w-full h-1.5 bg-slate-200 rounded-lg cursor-pointer">
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. 교과서 연계 3대 탐구 미션 챌린지 -->
+        <div class="bg-gradient-to-br from-indigo-50/70 to-blue-50/60 border border-indigo-200/80 rounded-2xl p-3.5 shadow-sm">
+          <div class="flex items-center justify-between mb-2">
+            <h2 class="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
+              <span>🎯</span> 교과서 연계 3대 탐구 미션
+            </h2>
+            <span class="text-[10px] bg-indigo-100 text-indigo-700 font-bold px-2 py-0.5 rounded-full">실험실</span>
+          </div>
+
+          <!-- 미션 카드 목록 -->
+          <div class="space-y-2">
+            <!-- 미션 1 -->
+            <div id="mission-card-1" class="bg-white rounded-xl p-3 border border-indigo-100 shadow-sm transition hover:border-indigo-300">
+              <div class="flex items-start justify-between">
+                <div>
+                  <div class="flex items-center gap-1.5">
+                    <span class="text-xs font-bold text-slate-800">미션 1. 평화로운 초원 유지하기</span>
+                    <span id="mission-status-1" class="text-[10px] px-1.5 py-0.2 bg-slate-100 text-slate-500 rounded font-semibold">대기중</span>
+                  </div>
+                  <p class="text-[11px] text-slate-500 mt-1">세 생물종 모두 멸종하지 않고 45초 동안 생태계 평형 피라미드를 지속하세요.</p>
+                </div>
+                <button id="btn-start-mission-1" class="shrink-0 px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-xs shadow-sm transition">
+                  도전
+                </button>
+              </div>
+              <div id="mission-progress-1" class="mt-2 hidden">
+                <div class="flex justify-between text-[10px] font-semibold text-indigo-600 mb-0.5">
+                  <span>진행 시간</span>
+                  <span id="mission-timer-1">0 / 45초</span>
+                </div>
+                <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                  <div id="mission-bar-1" class="bg-indigo-500 h-full rounded-full transition-all" style="width: 0%"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 미션 2 -->
+            <div id="mission-card-2" class="bg-white rounded-xl p-3 border border-indigo-100 shadow-sm transition hover:border-indigo-300">
+              <div class="flex items-start justify-between">
+                <div>
+                  <div class="flex items-center gap-1.5">
+                    <span class="text-xs font-bold text-slate-800">미션 2. 카이바브 고원의 비극</span>
+                    <span id="mission-status-2" class="text-[10px] px-1.5 py-0.2 bg-slate-100 text-slate-500 rounded font-semibold">대기중</span>
+                  </div>
+                  <p class="text-[11px] text-slate-500 mt-1">포식자(여우)를 모두 사냥해 없앴을 때 일어나는 토끼의 폭증과 초원 황폐화를 관찰하고 퀴즈를 풀어보세요.</p>
+                </div>
+                <button id="btn-start-mission-2" class="shrink-0 px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-xs shadow-sm transition">
+                  체험
+                </button>
+              </div>
+            </div>
+
+            <!-- 미션 3 -->
+            <div id="mission-card-3" class="bg-white rounded-xl p-3 border border-indigo-100 shadow-sm transition hover:border-indigo-300">
+              <div class="flex items-start justify-between">
+                <div>
+                  <div class="flex items-center gap-1.5">
+                    <span class="text-xs font-bold text-slate-800">미션 3. 극심한 가뭄 위기 극복</span>
+                    <span id="mission-status-3" class="text-[10px] px-1.5 py-0.2 bg-slate-100 text-slate-500 rounded font-semibold">대기중</span>
+                  </div>
+                  <p class="text-[11px] text-slate-500 mt-1">풀이 자라지 않는 가뭄 재해 속에서 인간의 적절한 개입(물 공급, 긴급 개체 조절)으로 멸종을 막아내세요.</p>
+                </div>
+                <button id="btn-start-mission-3" class="shrink-0 px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-xs shadow-sm transition">
+                  구조
+                </button>
+              </div>
+              <div id="mission-progress-3" class="mt-2 hidden">
+                <div class="flex justify-between text-[10px] font-semibold text-rose-600 mb-0.5">
+                  <span>위기 생존 시간</span>
+                  <span id="mission-timer-3">0 / 40초</span>
+                </div>
+                <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                  <div id="mission-bar-3" class="bg-rose-500 h-full rounded-full transition-all" style="width: 0%"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. 교과서 핵심 탐구 가이드 카드 -->
+        <div class="bg-emerald-50/70 border border-emerald-200/80 rounded-2xl p-3 text-xs text-emerald-900 leading-relaxed">
+          <div class="font-bold flex items-center gap-1.5 mb-1 text-emerald-800">
+            <span>💡</span> 초등 5~6 과학 개념 쏙쏙!
+          </div>
+          <p class="text-[11px] text-emerald-700">
+            <strong>생태계 평형</strong>이란 어떤 생태계를 이루는 생물의 종류와 개체 수가 일정한 수준을 유지하여 균형을 이루는 상태를 말합니다. 일시적으로 균형이 깨지더라도 먹이사슬을 통해 자연스럽게 스스로 평형을 되찾아갑니다.
+          </p>
+        </div>
+
+      </div>
+    </aside>
+  </main>
+
+  <!-- ========================================== -->
+  <!-- 3. 팝업 모달군 (학습 가이드, 퀴즈, 미션 성공) -->
+  <!-- ========================================== -->
+
+  <!-- [도움말 모달] -->
+  <div id="modal-help" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 overflow-y-auto max-h-[85vh]">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+        <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+          <span>🌿</span> 생태계 균형 시뮬레이터 사용 가이드
+        </h2>
+        <button id="btn-close-help" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 font-bold">✕</button>
+      </div>
+
+      <div class="space-y-4 text-xs text-slate-600 leading-relaxed">
+        <div class="p-3 bg-emerald-50 rounded-2xl border border-emerald-100">
+          <h3 class="font-bold text-emerald-900 text-sm mb-1">📖 무엇을 배우는 시뮬레이터인가요?</h3>
+          <p>
+            초등학교 과학 시간에 배우는 <strong>생산자(토끼풀)</strong>, <strong>1차 소비자(초원토끼)</strong>, <strong>2차 소비자(붉은여우)</strong>의 먹고 먹히는 관계를 컴퓨터 시뮬레이션으로 생생하게 탐구합니다.
+          </p>
+        </div>
+
+        <div class="space-y-2">
+          <h3 class="font-bold text-slate-800 text-sm">🎮 주요 조작 방법</h3>
+          <ul class="list-disc pl-5 space-y-1">
+            <li><strong>생물 브러시 도구</strong>: 상단의 풀, 토끼, 여우 버튼을 누른 뒤 초원을 드래그하면 원하는 곳에 생물을 놓아줄 수 있습니다.</li>
+            <li><strong>개체 돋보기 추적</strong>: <kbd class="px-1.5 py-0.5 bg-slate-100 border rounded text-[10px]">관찰·추적</kbd> 모드에서 토끼나 여우를 클릭하면 시야각, 타겟, 에너지 상태를 관찰할 수 있습니다.</li>
+            <li><strong>환경 변수 조절</strong>: 일조량(풀 번식력)이나 포식자의 속력을 슬라이더로 직접 바꾸어 생태계가 어떻게 반응하는지 확인해보세요.</li>
+            <li><strong>시간 및 배속</strong>: 일시정지, 0.5x, 1x, 2x, 4x 배속을 통해 빠른 생태계 변화를 관찰할 수 있습니다.</li>
+          </ul>
+        </div>
+
+        <div class="space-y-2">
+          <h3 class="font-bold text-slate-800 text-sm">📈 그래프와 피라미드 읽는 법</h3>
+          <p>
+            토끼가 늘어나면 풀이 줄어들고, 이어서 여우가 늘어납니다. 먹이가 부족해진 토끼가 줄어들면 다시 풀이 자라나고 여우도 줄어드는 <strong>파동 주기(로트카-볼테라 평형)</strong>를 눈여겨보세요!
+          </p>
+        </div>
+      </div>
+
+      <div class="mt-6 pt-3 border-t border-slate-100 flex justify-end">
+        <button id="btn-confirm-help" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow-md transition">
+          탐구 시작하기
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- [카이바브 고원 및 성찰 퀴즈 모달] -->
+  <div id="modal-quiz" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
+        <div class="flex items-center gap-2">
+          <span class="text-2xl">🧐</span>
+          <div>
+            <h2 class="text-base font-bold text-slate-800">탐구 성찰 퀴즈</h2>
+            <p class="text-[11px] text-slate-500">카이바브 고원의 비극과 생태계 평형의 원리</p>
+          </div>
+        </div>
+        <button id="btn-close-quiz" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 font-bold">✕</button>
+      </div>
+
+      <div id="quiz-question-box" class="py-2 text-xs space-y-3">
+        <div class="p-3 bg-indigo-50 border border-indigo-100 rounded-2xl text-indigo-900 font-medium leading-relaxed">
+          <strong>Q.</strong> 미국 카이바브 고원에서 사슴을 보호하기 위해 늑대와 퓨마 같은 포식자를 모두 사냥하여 없앴더니, 결국 어떤 결과가 일어났을까요?
+        </div>
+
+        <div class="space-y-2" id="quiz-options">
+          <button data-answer="1" class="quiz-option w-full p-3 text-left rounded-xl border border-slate-200 hover:bg-slate-50 transition text-slate-700 font-medium flex items-center gap-2">
+            <span class="w-5 h-5 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center text-xs font-bold">1</span>
+            <span>사슴이 무한히 번성하여 지상 최고의 낙원이 되었다.</span>
+          </button>
+          <button data-answer="2" class="quiz-option w-full p-3 text-left rounded-xl border border-slate-200 hover:bg-slate-50 transition text-slate-700 font-medium flex items-center gap-2">
+            <span class="w-5 h-5 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center text-xs font-bold">2</span>
+            <span>사슴이 급증해 풀이 고갈되고, 결국 굶주림과 질병으로 대량 아사했다.</span>
+          </button>
+          <button data-answer="3" class="quiz-option w-full p-3 text-left rounded-xl border border-slate-200 hover:bg-slate-50 transition text-slate-700 font-medium flex items-center gap-2">
+            <span class="w-5 h-5 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center text-xs font-bold">3</span>
+            <span>풀이 너무 많이 자라나 사슴이 길을 잃었다.</span>
+          </button>
+        </div>
+
+        <div id="quiz-feedback" class="p-3 rounded-xl text-xs font-bold hidden leading-relaxed"></div>
+      </div>
+
+      <div class="mt-4 pt-3 border-t border-slate-100 flex justify-end">
+        <button id="btn-next-quiz" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs shadow-md transition hidden">
+          확인 완료
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- [미션 성공 축하 팝업 모달] -->
+  <div id="modal-mission-success" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-emerald-200 text-center animate-pulse-subtle">
+      <div class="w-16 h-16 mx-auto mb-3 rounded-2xl bg-gradient-to-tr from-amber-400 to-emerald-400 flex items-center justify-center text-white text-3xl shadow-lg">
+        🏆
+      </div>
+      <h2 id="success-mission-title" class="text-lg font-bold text-slate-800">미션 1 클리어!</h2>
+      <p id="success-mission-desc" class="text-xs text-slate-600 mt-2 leading-relaxed">
+        생태계 평형을 안정적으로 유지하는데 성공했습니다! 생산자, 1차 소비자, 2차 소비자가 조화를 이루며 생명력이 넘치는 초원을 만들었습니다.
+      </p>
+      <div class="mt-6 flex justify-center gap-2">
+        <button id="btn-success-close" class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow-lg transition">
+          멋져요! 계속 탐구하기
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- 4. 순수 자바스크립트 시뮬레이션 엔진 -->
+  <!-- ========================================== -->
+  <script>
+    /**
+     * =========================================================================
+     * [섹션 2] Web Audio API 절차적 사운드 신시사이저 (MP3 의존성 제로)
+     * =========================================================================
+     */
+    class SoundFX {
+      constructor() {
+        this.ctx = null;
+        this.muted = false;
+        this.initContext();
+      }
+
+      initContext() {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (AudioCtx) {
+          this.ctx = new AudioCtx();
+        }
+      }
+
+      resume() {
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+
+      playTone(freq, type = 'sine', duration = 0.1, gainVal = 0.1) {
+        if (this.muted || !this.ctx) return;
+        this.resume();
+        try {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = type;
+          osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+
+          gain.gain.setValueAtTime(gainVal, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + duration);
+
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+
+          osc.start();
+          osc.stop(this.ctx.currentTime + duration);
+        } catch (e) {
+          // ignore audio failure
+        }
+      }
+
+      // 풀 뜯어먹는 소리 (톡/팝)
+      playEatGrass() {
+        if (this.muted) return;
+        this.playTone(480 + Math.random() * 80, 'triangle', 0.08, 0.05);
+      }
+
+      // 사냥 성공 소리 (쫀득한 챱)
+      playHunt() {
+        if (this.muted) return;
+        this.playTone(260, 'sawtooth', 0.15, 0.08);
+        setTimeout(() => this.playTone(180, 'sine', 0.1, 0.07), 40);
+      }
+
+      // 번식 탄생 소리 (귀여운 차임벨)
+      playBirth() {
+        if (this.muted) return;
+        this.playTone(523.25, 'sine', 0.1, 0.06); // C5
+        setTimeout(() => this.playTone(659.25, 'sine', 0.15, 0.06), 70); // E5
+        setTimeout(() => this.playTone(783.99, 'sine', 0.2, 0.06), 140); // G5
+      }
+
+      // 경보음 (생태계 불균형)
+      playAlarm() {
+        if (this.muted) return;
+        this.playTone(880, 'sawtooth', 0.12, 0.05);
+      }
+
+      // 미션 클리어 팡파르
+      playFanfare() {
+        if (this.muted) return;
+        const notes = [523.25, 659.25, 783.99, 1046.5];
+        notes.forEach((freq, i) => {
+          setTimeout(() => this.playTone(freq, 'triangle', 0.25, 0.1), i * 110);
+        });
+      }
+
+      // 천둥/가뭄 재해음 (노이즈 에뮬레이션)
+      playRumble() {
+        if (this.muted) return;
+        this.playTone(85, 'sawtooth', 0.4, 0.09);
+        setTimeout(() => this.playTone(60, 'square', 0.5, 0.08), 80);
+      }
+    }
+
+    const sfx = new SoundFX();
+
+    /**
+     * =========================================================================
+     * [섹션 3] 2D 벡터 수학 및 공간 분할 해시 그리드 (Spatial Hash Grid)
+     * =========================================================================
+     */
+    class Vec2 {
+      constructor(x = 0, y = 0) {
+        this.x = x;
+        this.y = y;
+      }
+
+      set(x, y) {
+        this.x = x;
+        this.y = y;
+        return this;
+      }
+
+      clone() {
+        return new Vec2(this.x, this.y);
+      }
+
+      add(v) {
+        this.x += v.x;
+        this.y += v.y;
+        return this;
+      }
+
+      sub(v) {
+        this.x -= v.x;
+        this.y -= v.y;
+        return this;
+      }
+
+      mult(n) {
+        this.x *= n;
+        this.y *= n;
+        return this;
+      }
+
+      div(n) {
+        if (n !== 0) {
+          this.x /= n;
+          this.y /= n;
+        }
+        return this;
+      }
+
+      magSq() {
+        return this.x * this.x + this.y * this.y;
+      }
+
+      mag() {
+        return Math.sqrt(this.magSq());
+      }
+
+      dist(v) {
+        const dx = this.x - v.x;
+        const dy = this.y - v.y;
+        return Math.sqrt(dx * dx + dy * dy);
+      }
+
+      distSq(v) {
+        const dx = this.x - v.x;
+        const dy = this.y - v.y;
+        return dx * dx + dy * dy;
+      }
+
+      normalize() {
+        const m = this.mag();
+        if (m > 0.00001) this.div(m);
+        return this;
+      }
+
+      limit(max) {
+        if (this.magSq() > max * max) {
+          this.normalize().mult(max);
+        }
+        return this;
+      }
+
+      heading() {
+        return Math.atan2(this.y, this.x);
+      }
+
+      static dist(v1, v2) {
+        return v1.dist(v2);
+      }
+    }
+
+    // O(N) 고속 이웃 탐색을 위한 공간 분할 해시 그리드
+    class SpatialGrid {
+      constructor(width, height, cellSize = 60) {
+        this.width = width;
+        this.height = height;
+        this.cellSize = cellSize;
+        this.cols = Math.ceil(width / cellSize);
+        this.rows = Math.ceil(height / cellSize);
+        this.grid = [];
+        this.clear();
+      }
+
+      resize(width, height) {
+        this.width = width;
+        this.height = height;
+        this.cols = Math.ceil(width / this.cellSize);
+        this.rows = Math.ceil(height / this.cellSize);
+        this.clear();
+      }
+
+      clear() {
+        const total = this.cols * this.rows;
+        this.grid = new Array(total);
+        for (let i = 0; i < total; i++) {
+          this.grid[i] = [];
+        }
+      }
+
+      getIndex(x, y) {
+        const c = Math.floor(x / this.cellSize);
+        const r = Math.floor(y / this.cellSize);
+        if (c < 0 || c >= this.cols || r < 0 || r >= this.rows) return -1;
+        return r * this.cols + c;
+      }
+
+      insert(entity) {
+        const idx = this.getIndex(entity.pos.x, entity.pos.y);
+        if (idx !== -1) {
+          this.grid[idx].push(entity);
+        }
+      }
+
+      // pos 중심 radius 반경 내 인접 셀 객체들 조회
+      queryRadius(pos, radius) {
+        const results = [];
+        const minC = Math.max(0, Math.floor((pos.x - radius) / this.cellSize));
+        const maxC = Math.min(this.cols - 1, Math.floor((pos.x + radius) / this.cellSize));
+        const minR = Math.max(0, Math.floor((pos.y - radius) / this.cellSize));
+        const maxR = Math.min(this.rows - 1, Math.floor((pos.y + radius) / this.cellSize));
+
+        const rSq = radius * radius;
+        for (let r = minR; r <= maxR; r++) {
+          for (let c = minC; c <= maxC; c++) {
+            const cell = this.grid[r * this.cols + c];
+            for (let i = 0; i < cell.length; i++) {
+              const ent = cell[i];
+              if (ent.pos.distSq(pos) <= rSq) {
+                results.push(ent);
+              }
+            }
+          }
+        }
+        return results;
+      }
+    }
+
+    /**
+     * =========================================================================
+     * [섹션 4] 생산자(풀) 및 소비자(토끼, 여우) 자율 에이전트 클래스
+     * =========================================================================
+     */
+
+    // 생산자: 토끼풀 (Grass)
+    class Grass {
+      static idCounter = 1;
+      constructor(x, y, growth = 0.3) {
+        this.id = Grass.idCounter++;
+        this.pos = new Vec2(x, y);
+        this.growth = growth; // 0.0 ~ 1.0 (성장도에 따라 섭식 가능)
+        this.maxEnergy = 40;
+        this.energy = this.growth * this.maxEnergy;
+        this.spreadTimer = Math.random() * 8 + 6; // 번식 타이머
+        this.alive = true;
+      }
+
+      update(dt, sunlight) {
+        if (!this.alive) return;
+        // 햇빛과 비에 비례한 광합성 성장
+        if (this.growth < 1.0) {
+          this.growth += (0.05 * sunlight) * dt;
+          if (this.growth > 1.0) this.growth = 1.0;
+          this.energy = this.growth * this.maxEnergy;
+        }
+
+        // 주변 번식 쿨다운
+        this.spreadTimer -= dt * sunlight;
+      }
+
+      draw(ctx) {
+        const size = 3 + this.growth * 5;
+        ctx.save();
+        ctx.translate(this.pos.x, this.pos.y);
+
+        // 풀잎 3갈래 벡터 드로잉
+        const colG = Math.floor(130 + this.growth * 70);
+        ctx.fillStyle = `rgb(34, ${colG}, 60)`;
+        ctx.strokeStyle = `rgb(22, 101, 52)`;
+        ctx.lineWidth = 1;
+
+        // 중앙 잎
+        ctx.beginPath();
+        ctx.ellipse(0, -size * 0.7, size * 0.4, size * 0.9, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // 좌측 잎
+        ctx.beginPath();
+        ctx.ellipse(-size * 0.6, -size * 0.4, size * 0.3, size * 0.7, -Math.PI / 4, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 우측 잎
+        ctx.beginPath();
+        ctx.ellipse(size * 0.6, -size * 0.4, size * 0.3, size * 0.7, Math.PI / 4, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+      }
+    }
+
+    // 소비자 베이스 클래스 (자율 이동, 생애주기, Boids 조향)
+    class Animal {
+      constructor(x, y, species) {
+        this.id = Math.floor(Math.random() * 90000 + 10000);
+        this.pos = new Vec2(x, y);
+        this.vel = new Vec2((Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2);
+        this.acc = new Vec2(0, 0);
+        this.species = species; // 'rabbit' | 'fox'
+        this.alive = true;
+        this.age = 0;
+        this.offspringCount = 0;
+
+        // 종별 기본 파라미터 (서브클래스에서 덮어씀)
+        this.maxSpeed = 2.0;
+        this.maxForce = 0.15;
+        this.visionRadius = 70;
+        this.energy = 50;
+        this.maxEnergy = 100;
+        this.reproduceEnergy = 80;
+        this.reproduceCooldown = 5.0; // 초
+        this.basalMetabolism = 1.0;
+        this.statusText = '배회 중';
+        this.actionEmotion = ''; // '💭', '⚡', '💦', '❤️'
+        this.target = null;
+      }
+
+      applyForce(force) {
+        this.acc.add(force);
+      }
+
+      // 조향력 계산 (Steering = Desired - Velocity)
+      seek(targetPos, arrival = false) {
+        const desired = targetPos.clone().sub(this.pos);
+        const d = desired.mag();
+        if (d === 0) return new Vec2(0, 0);
+
+        let speed = this.maxSpeed;
+        if (arrival && d < 25) {
+          speed = (d / 25) * this.maxSpeed;
+        }
+        desired.normalize().mult(speed);
+        const steer = desired.sub(this.vel);
+        steer.limit(this.maxForce);
+        return steer;
+      }
+
+      flee(targetPos) {
+        const desired = this.pos.clone().sub(targetPos);
+        desired.normalize().mult(this.maxSpeed * 1.25); // 도망칠 때는 더 빠르게
+        const steer = desired.sub(this.vel);
+        steer.limit(this.maxForce * 1.5);
+        return steer;
+      }
+
+      wander() {
+        const circleRadius = 20;
+        const circleDist = 40;
+        const change = 0.5;
+        if (!this.wanderAngle) this.wanderAngle = Math.random() * Math.PI * 2;
+        this.wanderAngle += (Math.random() - 0.5) * change;
+
+        const circleCenter = this.vel.clone().normalize().mult(circleDist);
+        const displacement = new Vec2(Math.cos(this.wanderAngle), Math.sin(this.wanderAngle)).mult(circleRadius);
+        const wanderForce = circleCenter.add(displacement);
+        wanderForce.limit(this.maxForce * 0.4);
+        return wanderForce;
+      }
+
+      // 벽 경계 반사 / 밀어내기
+      boundaries(width, height, margin = 40) {
+        const desired = new Vec2(0, 0);
+        if (this.pos.x < margin) desired.x = this.maxSpeed;
+        else if (this.pos.x > width - margin) desired.x = -this.maxSpeed;
+
+        if (this.pos.y < margin) desired.y = this.maxSpeed;
+        else if (this.pos.y > height - margin) desired.y = -this.maxSpeed;
+
+        if (desired.x !== 0 || desired.y !== 0) {
+          const steer = desired.sub(this.vel);
+          steer.limit(this.maxForce * 1.8);
+          this.applyForce(steer);
+        }
+
+        // 월드 밖 이탈 방지 클램핑
+        if (this.pos.x < 5) this.pos.x = 5;
+        if (this.pos.x > width - 5) this.pos.x = width - 5;
+        if (this.pos.y < 5) this.pos.y = 5;
+        if (this.pos.y > height - 5) this.pos.y = height - 5;
+      }
+
+      // 동족 간 분리 (Separation)
+      separate(neighbors, desiredDist = 25) {
+        const steer = new Vec2(0, 0);
+        let count = 0;
+        for (let i = 0; i < neighbors.length; i++) {
+          const other = neighbors[i];
+          if (other !== this && other.species === this.species) {
+            const d = this.pos.dist(other.pos);
+            if (d > 0 && d < desiredDist) {
+              const diff = this.pos.clone().sub(other.pos).normalize().div(d);
+              steer.add(diff);
+              count++;
+            }
+          }
+        }
+        if (count > 0) {
+          steer.div(count);
+          steer.normalize().mult(this.maxSpeed);
+          steer.sub(this.vel);
+          steer.limit(this.maxForce * 1.2);
+        }
+        return steer;
+      }
+
+      basePhysicsUpdate(dt) {
+        this.vel.add(this.acc);
+        this.vel.limit(this.maxSpeed);
+        this.pos.add(this.vel.clone().mult(dt * 60)); // 60fps 기준 표준화
+        this.acc.set(0, 0);
+
+        this.age += dt;
+        this.reproduceCooldown -= dt;
+
+        // 에너지 소모 = 기초 대사량 + 속도 비례 소모
+        const speedRatio = this.vel.mag() / (this.maxSpeed || 1);
+        const energyCost = (this.basalMetabolism + speedRatio * 1.5) * dt;
+        this.energy -= energyCost;
+
+        if (this.energy <= 0) {
+          this.alive = false;
+        }
+      }
+    }
+
+    // 1차 소비자: 초원토끼 (Rabbit)
+    class Rabbit extends Animal {
+      constructor(x, y) {
+        super(x, y, 'rabbit');
+        this.maxSpeed = 2.1;
+        this.maxForce = 0.16;
+        this.visionRadius = 90;
+        this.energy = 55;
+        this.maxEnergy = 110;
+        this.reproduceEnergy = 85;
+        this.reproduceCooldown = 6.0;
+        this.basalMetabolism = 1.8;
+      }
+
+      update(dt, world, metabolismScale = 1.0) {
+        if (!this.alive) return;
+
+        this.basalMetabolism = 1.8 * metabolismScale;
+
+        // 1. 주변 여우(천적) 감지 -> 도주(Flee) 우선
+        const nearbyFoxes = world.spatialGridFox.queryRadius(this.pos, this.visionRadius);
+        let closestFox = null;
+        let minFoxDist = Infinity;
+
+        for (let i = 0; i < nearbyFoxes.length; i++) {
+          const f = nearbyFoxes[i];
+          if (f.alive) {
+            const d = this.pos.distSq(f.pos);
+            if (d < minFoxDist) {
+              minFoxDist = d;
+              closestFox = f;
+            }
+          }
+        }
+
+        if (closestFox) {
+          // 천적 발견! 비명 도주
+          this.statusText = '여우를 피해 도주 중!';
+          this.actionEmotion = '💦';
+          this.target = closestFox.pos;
+          const fleeForce = this.flee(closestFox.pos);
+          this.applyForce(fleeForce.mult(2.2));
+        } else {
+          // 2. 평상시: 배고프면 풀 탐색(Seek)
+          if (this.energy < this.maxEnergy * 0.85) {
+            const nearbyGrass = world.spatialGridGrass.queryRadius(this.pos, this.visionRadius);
+            let closestGrass = null;
+            let minGrassDist = Infinity;
+
+            for (let i = 0; i < nearbyGrass.length; i++) {
+              const g = nearbyGrass[i];
+              if (g.alive && g.growth >= 0.4) {
+                const d = this.pos.distSq(g.pos);
+                if (d < minGrassDist) {
+                  minGrassDist = d;
+                  closestGrass = g;
+                }
+              }
+            }
+
+            if (closestGrass) {
+              this.statusText = '풀 섭취하러 이동';
+              this.actionEmotion = this.energy < 30 ? '💭' : '';
+              this.target = closestGrass.pos;
+              const seekForce = this.seek(closestGrass.pos);
+              this.applyForce(seekForce.mult(1.5));
+
+              // 풀에 충분히 접근했으면 섭취 판정
+              if (this.pos.dist(closestGrass.pos) < 14) {
+                const gained = closestGrass.energy * 0.8;
+                this.energy = Math.min(this.maxEnergy, this.energy + gained);
+                closestGrass.alive = false;
+                world.particles.push(new Particle(closestGrass.pos.x, closestGrass.pos.y, '🌱', 15));
+                sfx.playEatGrass();
+                this.statusText = '풀 뜯어먹음';
+              }
+            } else {
+              this.wanderAround(world);
+            }
+          } else {
+            this.wanderAround(world);
+          }
+        }
+
+        // 동족 간 분리
+        const nearbyRabbits = world.spatialGridRabbit.queryRadius(this.pos, 30);
+        const sepForce = this.separate(nearbyRabbits, 20);
+        this.applyForce(sepForce.mult(1.0));
+
+        // 월드 경계 회피
+        this.boundaries(world.width, world.height);
+
+        // 물리 갱신
+        this.basePhysicsUpdate(dt);
+
+        // 번식 검사
+        if (this.energy >= this.reproduceEnergy && this.reproduceCooldown <= 0 && world.rabbits.length < 180) {
+          this.reproduce(world);
+        }
+      }
+
+      wanderAround(world) {
+        this.statusText = '초원 배회 중';
+        this.actionEmotion = '';
+        this.target = null;
+        this.applyForce(this.wander());
+      }
+
+      reproduce(world) {
+        this.energy = this.energy * 0.52;
+        this.reproduceCooldown = 6.0 + Math.random() * 2.0;
+        this.offspringCount++;
+
+        const baby = new Rabbit(
+          this.pos.x + (Math.random() - 0.5) * 15,
+          this.pos.y + (Math.random() - 0.5) * 15
+        );
+        baby.energy = 45;
+        world.rabbits.push(baby);
+        world.particles.push(new Particle(this.pos.x, this.pos.y, '❤️', 25));
+        sfx.playBirth();
+      }
+
+      draw(ctx, isSelected = false) {
+        ctx.save();
+        ctx.translate(this.pos.x, this.pos.y);
+        const angle = this.vel.heading();
+        ctx.rotate(angle);
+
+        // 하이라이트 원 (선택된 경우)
+        if (isSelected) {
+          ctx.beginPath();
+          ctx.arc(0, 0, 16, 0, Math.PI * 2);
+          ctx.strokeStyle = '#38bdf8';
+          ctx.lineWidth = 2.5;
+          ctx.stroke();
+        }
+
+        // 토끼 몸체 (동글동글한 흰색/연파랑 털)
+        ctx.fillStyle = '#ffffff';
+        ctx.strokeStyle = '#94a3b8';
+        ctx.lineWidth = 1;
+
+        // 꼬리
+        ctx.beginPath();
+        ctx.arc(-9, 0, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // 몸통 타원
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 9, 7, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // 머리
+        ctx.beginPath();
+        ctx.arc(6, 0, 5.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // 토끼 귀 2개 (뒤쪽으로 누운 귀)
+        ctx.fillStyle = '#fce7f3';
+        ctx.strokeStyle = '#cbd5e1';
+        ctx.beginPath();
+        ctx.ellipse(-1, -6, 5, 2, -Math.PI / 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.ellipse(-1, 6, 5, 2, Math.PI / 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // 눈
+        ctx.fillStyle = '#1e293b';
+        ctx.beginPath();
+        ctx.arc(8, -2, 1.2, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+
+        // 머리 위 감정/상태 아이콘 렌더링
+        if (this.actionEmotion) {
+          ctx.font = '12px Pretendard, sans-serif';
+          ctx.fillText(this.actionEmotion, this.pos.x - 6, this.pos.y - 12);
+        }
+      }
+    }
+
+    // 2차 소비자: 붉은여우 (Fox)
+    class Fox extends Animal {
+      constructor(x, y) {
+        super(x, y, 'fox');
+        this.maxSpeed = 2.6;
+        this.maxForce = 0.19;
+        this.visionRadius = 125;
+        this.energy = 80;
+        this.maxEnergy = 160;
+        this.reproduceEnergy = 135;
+        this.reproduceCooldown = 11.0;
+        this.basalMetabolism = 3.2; // 포식자는 기초 대사량이 큼
+      }
+
+      update(dt, world, speedScale = 2.6) {
+        if (!this.alive) return;
+
+        this.maxSpeed = speedScale;
+
+        // 시야 내 가장 가까운 토끼 추격 (Pursuit)
+        const nearbyRabbits = world.spatialGridRabbit.queryRadius(this.pos, this.visionRadius);
+        let closestRabbit = null;
+        let minRabbitDist = Infinity;
+
+        for (let i = 0; i < nearbyRabbits.length; i++) {
+          const r = nearbyRabbits[i];
+          if (r.alive) {
+            const d = this.pos.distSq(r.pos);
+            if (d < minRabbitDist) {
+              minRabbitDist = d;
+              closestRabbit = r;
+            }
+          }
+        }
+
+        if (closestRabbit) {
+          // 토끼 포착! 맹렬한 추격
+          this.statusText = '토끼 추격 중!';
+          this.actionEmotion = '⚡';
+          this.target = closestRabbit.pos;
+
+          // 미래 위치 예측 추격 벡터
+          const predDist = this.pos.dist(closestRabbit.pos);
+          const timeAhead = Math.min(predDist / this.maxSpeed, 15);
+          const predPos = closestRabbit.pos.clone().add(closestRabbit.vel.clone().mult(timeAhead));
+
+          const pursuitForce = this.seek(predPos);
+          this.applyForce(pursuitForce.mult(1.8));
+
+          // 포식 판정
+          if (this.pos.dist(closestRabbit.pos) < 16) {
+            closestRabbit.alive = false;
+            this.energy = Math.min(this.maxEnergy, this.energy + 65);
+            world.particles.push(new Particle(closestRabbit.pos.x, closestRabbit.pos.y, '💥', 20));
+            sfx.playHunt();
+            this.statusText = '토끼 사냥 성공';
+          }
+        } else {
+          // 먹잇감이 없으면 배회
+          this.statusText = '사냥감 수색 중';
+          this.actionEmotion = this.energy < 40 ? '💧' : '';
+          this.target = null;
+          this.applyForce(this.wander());
+        }
+
+        // 동족 여우 간 영역 유지 분리 (Separation)
+        const nearbyFoxes = world.spatialGridFox.queryRadius(this.pos, 50);
+        const sepForce = this.separate(nearbyFoxes, 40);
+        this.applyForce(sepForce.mult(1.4));
+
+        // 월드 경계 회피
+        this.boundaries(world.width, world.height);
+
+        // 물리 갱신
+        this.basePhysicsUpdate(dt);
+
+        // 번식 검사
+        if (this.energy >= this.reproduceEnergy && this.reproduceCooldown <= 0 && world.foxes.length < 50) {
+          this.reproduce(world);
+        }
+      }
+
+      reproduce(world) {
+        this.energy = this.energy * 0.52;
+        this.reproduceCooldown = 12.0 + Math.random() * 3.0;
+        this.offspringCount++;
+
+        const baby = new Fox(
+          this.pos.x + (Math.random() - 0.5) * 20,
+          this.pos.y + (Math.random() - 0.5) * 20
+        );
+        baby.energy = 70;
+        world.foxes.push(baby);
+        world.particles.push(new Particle(this.pos.x, this.pos.y, '❤️', 25));
+        sfx.playBirth();
+      }
+
+      draw(ctx, isSelected = false) {
+        ctx.save();
+        ctx.translate(this.pos.x, this.pos.y);
+        const angle = this.vel.heading();
+        ctx.rotate(angle);
+
+        // 하이라이트 원 (선택된 경우)
+        if (isSelected) {
+          ctx.beginPath();
+          ctx.arc(0, 0, 22, 0, Math.PI * 2);
+          ctx.strokeStyle = '#f97316';
+          ctx.lineWidth = 2.5;
+          ctx.stroke();
+        }
+
+        // 풍성한 꼬리 (주황색 + 흰색 끝)
+        ctx.fillStyle = '#ea580c';
+        ctx.beginPath();
+        ctx.ellipse(-14, 0, 9, 5, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.ellipse(-19, 0, 4, 3, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 날렵한 몸통
+        ctx.fillStyle = '#f97316';
+        ctx.strokeStyle = '#c2410c';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 13, 8, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // 삼각형 여우 귀 2개
+        ctx.fillStyle = '#1e293b';
+        ctx.beginPath();
+        ctx.moveTo(3, -7);
+        ctx.lineTo(8, -13);
+        ctx.lineTo(9, -6);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.moveTo(3, 7);
+        ctx.lineTo(8, 13);
+        ctx.lineTo(9, 6);
+        ctx.closePath();
+        ctx.fill();
+
+        // 뾰족한 주둥이 (머리)
+        ctx.fillStyle = '#f97316';
+        ctx.beginPath();
+        ctx.moveTo(7, -6);
+        ctx.lineTo(17, 0);
+        ctx.lineTo(7, 6);
+        ctx.closePath();
+        ctx.fill();
+
+        // 뺨의 흰 털
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.ellipse(8, 0, 4, 5, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 검은 코
+        ctx.fillStyle = '#0f172a';
+        ctx.beginPath();
+        ctx.arc(16, 0, 1.8, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 눈
+        ctx.fillStyle = '#0f172a';
+        ctx.beginPath();
+        ctx.arc(10, -2.5, 1.3, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+
+        if (this.actionEmotion) {
+          ctx.font = '13px Pretendard, sans-serif';
+          ctx.fillText(this.actionEmotion, this.pos.x - 7, this.pos.y - 15);
+        }
+      }
+    }
+
+    // 간단한 파티클 시스템 (하트, 나뭇잎, 먼지)
+    class Particle {
+      constructor(x, y, text, life = 20) {
+        this.x = x;
+        this.y = y;
+        this.text = text;
+        this.life = life;
+        this.maxLife = life;
+        this.vx = (Math.random() - 0.5) * 1.5;
+        this.vy = -1.2 - Math.random() * 1.0;
+      }
+
+      update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.life--;
+      }
+
+      draw(ctx) {
+        ctx.save();
+        const alpha = Math.max(0, this.life / this.maxLife);
+        ctx.globalAlpha = alpha;
+        ctx.font = '13px sans-serif';
+        ctx.fillText(this.text, this.x, this.y);
+        ctx.restore();
+      }
+    }
+
+    /**
+     * =========================================================================
+     * [섹션 5] 시뮬레이션 월드 매니저 (EcosystemWorld)
+     * =========================================================================
+     */
+    class EcosystemWorld {
+      constructor(width, height) {
+        this.width = width;
+        this.height = height;
+
+        this.grass = [];
+        this.rabbits = [];
+        this.foxes = [];
+        this.particles = [];
+
+        // 공간 분할 격자
+        this.spatialGridGrass = new SpatialGrid(width, height, 50);
+        this.spatialGridRabbit = new SpatialGrid(width, height, 50);
+        this.spatialGridFox = new SpatialGrid(width, height, 50);
+
+        // 환경 변수 기본값 (로트카-볼테라 최적 밸런스)
+        this.sunlight = 1.0;
+        this.maxGrassCount = 240;
+        this.rabbitMetabolism = 1.0;
+        this.foxSpeed = 2.6;
+
+        this.selectedEntity = null; // 관찰 모드 선택 개체
+        this.simTime = 0; // 초
+        this.dormantRootTimer = 0; // 최소 풀 보장 씨앗 타이머
+
+        // 시계열 데이터 히스토리 (차트용)
+        this.history = [];
+        this.eventMarkers = []; // { time, label }
+        this.sampleTimer = 0;
+
+        this.initDefaultEcosystem();
+      }
+
+      resize(w, h) {
+        this.width = w;
+        this.height = h;
+        this.spatialGridGrass.resize(w, h);
+        this.spatialGridRabbit.resize(w, h);
+        this.spatialGridFox.resize(w, h);
+      }
+
+      initDefaultEcosystem() {
+        this.grass = [];
+        this.rabbits = [];
+        this.foxes = [];
+        this.particles = [];
+        this.simTime = 0;
+        this.history = [];
+        this.eventMarkers = [];
+        this.selectedEntity = null;
+
+        // 초등 교육용 안전 평형 초기값: 풀 160개, 토끼 36마리, 여우 7마리
+        const grassCount = 160;
+        for (let i = 0; i < grassCount; i++) {
+          this.grass.push(new Grass(
+            30 + Math.random() * (this.width - 60),
+            30 + Math.random() * (this.height - 60),
+            0.5 + Math.random() * 0.5
+          ));
+        }
+
+        const rabbitCount = 36;
+        for (let i = 0; i < rabbitCount; i++) {
+          this.rabbits.push(new Rabbit(
+            50 + Math.random() * (this.width - 100),
+            50 + Math.random() * (this.height - 100)
+          ));
+        }
+
+        const foxCount = 7;
+        for (let i = 0; i < foxCount; i++) {
+          this.foxes.push(new Fox(
+            80 + Math.random() * (this.width - 160),
+            80 + Math.random() * (this.height - 160)
+          ));
+        }
+
+        this.addEventMarker('생태계 시작');
+      }
+
+      addEventMarker(label) {
+        this.eventMarkers.push({
+          time: this.simTime,
+          label: label
+        });
+        if (this.eventMarkers.length > 15) {
+          this.eventMarkers.shift();
+        }
+
+        // UI에 잠시 뱃지 노출
+        const tag = document.getElementById('chart-event-tag');
+        if (tag) {
+          tag.innerText = label;
+          tag.classList.remove('hidden');
+          setTimeout(() => tag.classList.add('hidden'), 2500);
+        }
+      }
+
+      update(dt) {
+        this.simTime += dt;
+
+        // 1. 공간 그리드 초기화 및 현재 개체들 등록
+        this.spatialGridGrass.clear();
+        for (let i = 0; i < this.grass.length; i++) {
+          this.spatialGridGrass.insert(this.grass[i]);
+        }
+
+        this.spatialGridRabbit.clear();
+        for (let i = 0; i < this.rabbits.length; i++) {
+          this.spatialGridRabbit.insert(this.rabbits[i]);
+        }
+
+        this.spatialGridFox.clear();
+        for (let i = 0; i < this.foxes.length; i++) {
+          this.spatialGridFox.insert(this.foxes[i]);
+        }
+
+        // 2. 생산자(풀) 번식 및 자연 발아
+        for (let i = 0; i < this.grass.length; i++) {
+          const g = this.grass[i];
+          g.update(dt, this.sunlight);
+
+          // 다 자란 풀이 주변으로 씨앗 퍼뜨리기
+          if (g.spreadTimer <= 0 && this.grass.length < this.maxGrassCount && Math.random() < 0.3) {
+            g.spreadTimer = 8.0 + Math.random() * 6.0;
+            const spreadDist = 20 + Math.random() * 45;
+            const angle = Math.random() * Math.PI * 2;
+            const nx = Math.max(20, Math.min(this.width - 20, g.pos.x + Math.cos(angle) * spreadDist));
+            const ny = Math.max(20, Math.min(this.height - 20, g.pos.y + Math.sin(angle) * spreadDist));
+            this.grass.push(new Grass(nx, ny, 0.2));
+          }
+        }
+
+        // [안전장치]: 풀이 모두 전멸하지 않도록 토양 속 휴면 씨앗에서 최소한의 풀 발아 보장
+        this.dormantRootTimer += dt;
+        if (this.grass.length < 25 && this.dormantRootTimer > 2.0 && this.sunlight > 0.2) {
+          this.dormantRootTimer = 0;
+          this.grass.push(new Grass(
+            30 + Math.random() * (this.width - 60),
+            30 + Math.random() * (this.height - 60),
+            0.3
+          ));
+        }
+
+        // 죽은 풀 정리
+        this.grass = this.grass.filter(g => g.alive);
+
+        // 3. 소비자(토끼, 여우) 상태 및 물리 갱신
+        for (let i = 0; i < this.rabbits.length; i++) {
+          this.rabbits[i].update(dt, this, this.rabbitMetabolism);
+        }
+        this.rabbits = this.rabbits.filter(r => r.alive);
+
+        for (let i = 0; i < this.foxes.length; i++) {
+          this.foxes[i].update(dt, this, this.foxSpeed);
+        }
+        this.foxes = this.foxes.filter(f => f.alive);
+
+        // 파티클 갱신
+        for (let i = 0; i < this.particles.length; i++) {
+          this.particles[i].update();
+        }
+        this.particles = this.particles.filter(p => p.life > 0);
+
+        // 4. 시계열 데이터 주기적 샘플링 (0.4초마다 기록)
+        this.sampleTimer += dt;
+        if (this.sampleTimer >= 0.4) {
+          this.sampleTimer = 0;
+          this.history.push({
+            time: this.simTime,
+            grass: this.grass.length,
+            rabbit: this.rabbits.length,
+            fox: this.foxes.length
+          });
+          // 최대 120개 프레임 보관 (약 50초 궤적)
+          if (this.history.length > 120) {
+            this.history.shift();
+          }
+        }
+      }
+    }
+
+    /**
+     * =========================================================================
+     * [섹션 6] 시각화 렌더러 (월드 캔버스, 시계열 그래프, 생태계 피라미드)
+     * =========================================================================
+     */
+
+    // 메인 월드 렌더러
+    class WorldRenderer {
+      constructor(canvas, world) {
+        this.canvas = canvas;
+        this.ctx = canvas.getContext('2d');
+        this.world = world;
+      }
+
+      draw() {
+        const ctx = this.ctx;
+        const w = this.canvas.width;
+        const h = this.canvas.height;
+
+        // 배경: 초원 잔디 텍스처
+        const grad = ctx.createLinearGradient(0, 0, w, h);
+        grad.addColorStop(0, '#14532d'); // 깊은 녹색 숲
+        grad.addColorStop(0.5, '#166534');
+        grad.addColorStop(1, '#15803d');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, w, h);
+
+        // 부드러운 토양/지형 디테일 원형 장식
+        ctx.fillStyle = 'rgba(21, 128, 61, 0.4)';
+        ctx.beginPath();
+        ctx.arc(w * 0.25, h * 0.3, 140, 0, Math.PI * 2);
+        ctx.arc(w * 0.75, h * 0.7, 180, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 1. 풀 그리기
+        for (let i = 0; i < this.world.grass.length; i++) {
+          this.world.grass[i].draw(ctx);
+        }
+
+        // 2. 토끼 그리기
+        for (let i = 0; i < this.world.rabbits.length; i++) {
+          const r = this.world.rabbits[i];
+          r.draw(ctx, this.world.selectedEntity === r);
+        }
+
+        // 3. 여우 그리기
+        for (let i = 0; i < this.world.foxes.length; i++) {
+          const f = this.world.foxes[i];
+          f.draw(ctx, this.world.selectedEntity === f);
+        }
+
+        // 4. 선택된 개체의 시야각(FOV) 및 타겟 화살표 드로잉
+        if (this.world.selectedEntity && this.world.selectedEntity.alive) {
+          const ent = this.world.selectedEntity;
+
+          // 시야 반경 원
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(ent.pos.x, ent.pos.y, ent.visionRadius, 0, Math.PI * 2);
+          ctx.strokeStyle = ent.species === 'fox' ? 'rgba(249, 115, 22, 0.4)' : 'rgba(56, 189, 248, 0.4)';
+          ctx.fillStyle = ent.species === 'fox' ? 'rgba(249, 115, 22, 0.08)' : 'rgba(56, 189, 248, 0.08)';
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([4, 4]);
+          ctx.fill();
+          ctx.stroke();
+          ctx.restore();
+
+          // 타겟 목표물 화살표
+          if (ent.target) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(ent.pos.x, ent.pos.y);
+            ctx.lineTo(ent.target.x, ent.target.y);
+            ctx.strokeStyle = '#facc15';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([3, 3]);
+            ctx.stroke();
+            ctx.restore();
+          }
+        }
+
+        // 5. 파티클 이펙트
+        for (let i = 0; i < this.world.particles.length; i++) {
+          this.world.particles[i].draw(ctx);
+        }
+      }
+    }
+
+    // 시계열 꺾은선 그래프 렌더러 (순수 Canvas 2D)
+    class TimeChartRenderer {
+      constructor(canvas, world) {
+        this.canvas = canvas;
+        this.ctx = canvas.getContext('2d');
+        this.world = world;
+      }
+
+      draw() {
+        const ctx = this.ctx;
+        const w = this.canvas.width;
+        const h = this.canvas.height;
+        const data = this.world.history;
+
+        ctx.clearRect(0, 0, w, h);
+
+        // 차트 배경 그리드 라인
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+        ctx.lineWidth = 1;
+        for (let y = 0; y < h; y += h / 4) {
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(w, y);
+          ctx.stroke();
+        }
+
+        if (data.length < 2) return;
+
+        // 최대 개체 수 산정 (동적 스케일링)
+        let maxVal = 100;
+        for (let i = 0; i < data.length; i++) {
+          if (data[i].grass > maxVal) maxVal = data[i].grass;
+          if (data[i].rabbit > maxVal) maxVal = data[i].rabbit;
+          if (data[i].fox * 4 > maxVal) maxVal = data[i].fox * 4;
+        }
+        maxVal = Math.ceil(maxVal * 1.15);
+
+        // 스케일 라벨 갱신
+        const scaleLabel = document.getElementById('chart-scale-label');
+        if (scaleLabel) scaleLabel.innerText = `최대: ${maxVal}개체`;
+
+        const padX = 10;
+        const padY = 12;
+        const plotW = w - padX * 2;
+        const plotH = h - padY * 2;
+
+        const getX = (idx) => padX + (idx / (data.length - 1)) * plotW;
+        const getY = (val) => h - padY - (val / maxVal) * plotH;
+
+        // 1. 풀 곡선 (초록)
+        this.plotLine(ctx, data, d => d.grass, getX, getY, '#4ade80', 2);
+
+        // 2. 토끼 곡선 (파랑)
+        this.plotLine(ctx, data, d => d.rabbit, getX, getY, '#60a5fa', 2);
+
+        // 3. 여우 곡선 (주황) - 가독성을 위해 여우는 개체수 대비 살짝 강조
+        this.plotLine(ctx, data, d => d.fox, getX, getY, '#fb923c', 2.5);
+
+        // 4. 환경 이벤트 마커 표시
+        const curTime = this.world.simTime;
+        for (let i = 0; i < this.world.eventMarkers.length; i++) {
+          const ev = this.world.eventMarkers[i];
+          const timeDiff = curTime - ev.time;
+          // 약 48초 전(데이터 보존 기간) 이벤트만 표시
+          if (timeDiff >= 0 && timeDiff <= 48) {
+            const ratio = 1 - (timeDiff / 48);
+            const mx = padX + ratio * plotW;
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(mx, 5);
+            ctx.lineTo(mx, h - 5);
+            ctx.strokeStyle = '#f59e0b';
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([3, 3]);
+            ctx.stroke();
+
+            ctx.fillStyle = '#f59e0b';
+            ctx.font = '9px Pretendard, sans-serif';
+            ctx.fillText(ev.label, mx + 3, 14);
+            ctx.restore();
+          }
+        }
+      }
+
+      plotLine(ctx, data, valFn, getX, getY, color, lineWidth) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = lineWidth;
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+
+        for (let i = 0; i < data.length; i++) {
+          const x = getX(i);
+          const y = getY(valFn(data[i]));
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+
+        // 마지막 끝점에 동그라미 포인트
+        const lastIdx = data.length - 1;
+        const lx = getX(lastIdx);
+        const ly = getY(valFn(data[lastIdx]));
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(lx, ly, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    // 생태계 피라미드 렌더러 (Trophic Pyramid)
+    class PyramidRenderer {
+      constructor(canvas, world) {
+        this.canvas = canvas;
+        this.ctx = canvas.getContext('2d');
+        this.world = world;
+      }
+
+      draw() {
+        const ctx = this.ctx;
+        const w = this.canvas.width;
+        const h = this.canvas.height;
+
+        ctx.clearRect(0, 0, w, h);
+
+        const grassCount = this.world.grass.length;
+        const rabbitCount = this.world.rabbits.length;
+        const foxCount = this.world.foxes.length;
+        const total = grassCount + rabbitCount + foxCount;
+
+        if (total === 0) return;
+
+        const pGrass = grassCount / total;
+        const pRabbit = rabbitCount / total;
+        const pFox = foxCount / total;
+
+        // 안정적 피라미드 여부 검사 (생산자 > 1차 소비자 > 2차 소비자)
+        const isStable = grassCount >= rabbitCount && rabbitCount >= foxCount && foxCount > 0;
+        const warningEl = document.getElementById('pyramid-warning');
+        if (warningEl) {
+          if (!isStable) {
+            warningEl.classList.remove('hidden');
+          } else {
+            warningEl.classList.add('hidden');
+          }
+        }
+
+        const cx = w / 2;
+        const blockH = (h - 36) / 3;
+
+        // 1단 (상단): 2차 소비자 (여우)
+        const foxW = Math.max(30, Math.min(w * 0.9, pFox * w * 1.8));
+        this.drawBlock(ctx, cx, 16 + blockH * 0, foxW, blockH - 4, '#f97316', `2차(여우): ${foxCount}마리 (${Math.round(pFox * 100)}%)`);
+
+        // 2단 (중간): 1차 소비자 (토끼)
+        const rabbitW = Math.max(40, Math.min(w * 0.9, pRabbit * w * 1.8));
+        this.drawBlock(ctx, cx, 16 + blockH * 1, rabbitW, blockH - 4, '#3b82f6', `1차(토끼): ${rabbitCount}마리 (${Math.round(pRabbit * 100)}%)`);
+
+        // 3단 (하단): 생산자 (풀)
+        const grassW = Math.max(50, Math.min(w * 0.9, pGrass * w * 1.8));
+        this.drawBlock(ctx, cx, 16 + blockH * 2, grassW, blockH - 4, '#22c55e', `생산자(풀): ${grassCount}개 (${Math.round(pGrass * 100)}%)`);
+      }
+
+      drawBlock(ctx, cx, y, width, height, color, label) {
+        ctx.save();
+        const rx = cx - width / 2;
+        ctx.fillStyle = color;
+        ctx.shadowColor = 'rgba(0,0,0,0.3)';
+        ctx.shadowBlur = 6;
+
+        // 둥근 사각형 블록
+        this.roundRect(ctx, rx, y, width, height, 6);
+        ctx.fill();
+
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 11px Pretendard, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(label, cx, y + height / 2);
+        ctx.restore();
+      }
+
+      roundRect(ctx, x, y, w, h, r) {
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.lineTo(x + w - r, y);
+        ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+        ctx.lineTo(x + w, y + h - r);
+        ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+        ctx.lineTo(x + r, y + h);
+        ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+        ctx.lineTo(x, y + r);
+        ctx.quadraticCurveTo(x, y, x + r, y);
+        ctx.closePath();
+      }
+    }
+
+    /**
+     * =========================================================================
+     * [섹션 7] 미션 & 퀴즈 관리자 (MissionManager)
+     * =========================================================================
+     */
+    class MissionManager {
+      constructor(world) {
+        this.world = world;
+        this.activeMission = null; // 1, 2, 3
+        this.missionTimer = 0;
+        this.targetDuration = 45; // 초
+      }
+
+      startMission(missionId) {
+        this.activeMission = missionId;
+        this.missionTimer = 0;
+
+        // 모든 미션 UI 초기화
+        for (let i = 1; i <= 3; i++) {
+          const st = document.getElementById(`mission-status-${i}`);
+          if (st) {
+            st.innerText = (i === missionId) ? '진행중' : '대기중';
+            st.className = (i === missionId) ? 'text-[10px] px-1.5 py-0.2 bg-emerald-100 text-emerald-700 rounded font-bold' : 'text-[10px] px-1.5 py-0.2 bg-slate-100 text-slate-500 rounded font-semibold';
+          }
+          const prog = document.getElementById(`mission-progress-${i}`);
+          if (prog) prog.classList.add('hidden');
+        }
+
+        if (missionId === 1) {
+          // 미션 1: 평화로운 초원 45초 유지
+          this.targetDuration = 45;
+          document.getElementById('mission-progress-1').classList.remove('hidden');
+          this.world.addEventMarker('미션 1 시작');
+        } else if (missionId === 2) {
+          // 미션 2: 카이바브 고원의 비극 (여우 포획)
+          this.world.foxes = [];
+          this.world.addEventMarker('여우 전량 포획(미션2)');
+          sfx.playAlarm();
+          // 4초 후 토끼 급증 및 퀴즈 팝업
+          setTimeout(() => {
+            document.getElementById('modal-quiz').classList.remove('hidden');
+          }, 4500);
+        } else if (missionId === 3) {
+          // 미션 3: 가뭄 위기 극복 (풀 성장률 0.15로 급감)
+          this.targetDuration = 40;
+          this.world.sunlight = 0.15;
+          document.getElementById('param-sunlight').value = 0.15;
+          document.getElementById('label-sunlight').innerText = '가뭄 (0.15x)';
+          document.getElementById('mission-progress-3').classList.remove('hidden');
+          this.world.addEventMarker('⚡ 가뭄 발생(미션3)');
+          sfx.playRumble();
+        }
+      }
+
+      update(dt) {
+        if (!this.activeMission) return;
+
+        if (this.activeMission === 1) {
+          // 미션 1: 모든 종이 살아있고 피라미드가 유지되는가?
+          const g = this.world.grass.length;
+          const r = this.world.rabbits.length;
+          const f = this.world.foxes.length;
+
+          if (g > 10 && r > 5 && f > 2) {
+            this.missionTimer += dt;
+            const pct = Math.min(100, (this.missionTimer / this.targetDuration) * 100);
+            document.getElementById('mission-bar-1').style.width = `${pct}%`;
+            document.getElementById('mission-timer-1').innerText = `${Math.floor(this.missionTimer)} / ${this.targetDuration}초`;
+
+            if (this.missionTimer >= this.targetDuration) {
+              this.completeMission(1, '미션 1 달성: 평화로운 초원 완성!', '45초 동안 생산자와 소비자가 조화롭게 공존하는 건강한 생태계를 지켜냈습니다.');
+            }
+          } else {
+            // 균형 붕괴
+            document.getElementById('mission-status-1').innerText = '균형 붕괴 (재도전 필요)';
+            document.getElementById('mission-status-1').className = 'text-[10px] px-1.5 py-0.2 bg-rose-100 text-rose-700 rounded font-bold';
+          }
+        } else if (this.activeMission === 3) {
+          // 미션 3: 가뭄 극복 (가뭄 상황에서 40초 버티고 적절한 물 공급으로 풀/토끼/여우 생존 유지)
+          const g = this.world.grass.length;
+          const r = this.world.rabbits.length;
+          const f = this.world.foxes.length;
+
+          if (g > 5 && r > 2 && f > 1) {
+            this.missionTimer += dt;
+            const pct = Math.min(100, (this.missionTimer / this.targetDuration) * 100);
+            document.getElementById('mission-bar-3').style.width = `${pct}%`;
+            document.getElementById('mission-timer-3').innerText = `${Math.floor(this.missionTimer)} / ${this.targetDuration}초`;
+
+            if (this.missionTimer >= this.targetDuration) {
+              this.completeMission(3, '미션 3 달성: 생태계 위기 극복 성공!', '가뭄 위기 속에서도 지혜로운 개입으로 초원의 멸종을 성공적으로 막아냈습니다.');
+            }
+          }
+        }
+      }
+
+      completeMission(id, title, desc) {
+        this.activeMission = null;
+        sfx.playFanfare();
+        launchConfetti();
+
+        const st = document.getElementById(`mission-status-${id}`);
+        if (st) {
+          st.innerText = '성공! 🎉';
+          st.className = 'text-[10px] px-1.5 py-0.2 bg-emerald-600 text-white rounded font-bold';
+        }
+
+        document.getElementById('success-mission-title').innerText = title;
+        document.getElementById('success-mission-desc').innerText = desc;
+        document.getElementById('modal-mission-success').classList.remove('hidden');
+      }
+    }
+
+    // 순수 Canvas 축하 폭죽(Confetti) 파티클 애니메이션
+    function launchConfetti() {
+      const canvas = document.createElement('canvas');
+      canvas.style.position = 'fixed';
+      canvas.style.top = '0';
+      canvas.style.left = '0';
+      canvas.style.width = '100vw';
+      canvas.style.height = '100vh';
+      canvas.style.pointerEvents = 'none';
+      canvas.style.zIndex = '9999';
+      document.body.appendChild(canvas);
+
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      const ctx = canvas.getContext('2d');
+
+      const colors = ['#22c55e', '#3b82f6', '#f97316', '#eab308', '#ec4899', '#8b5cf6'];
+      const confettis = [];
+      for (let i = 0; i < 120; i++) {
+        confettis.push({
+          x: canvas.width / 2,
+          y: canvas.height * 0.4,
+          vx: (Math.random() - 0.5) * 16,
+          vy: -6 - Math.random() * 10,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          size: Math.random() * 8 + 4,
+          life: 90
+        });
+      }
+
+      function update() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        let alive = false;
+        for (let i = 0; i < confettis.length; i++) {
+          const c = confettis[i];
+          if (c.life > 0) {
+            c.x += c.vx;
+            c.y += c.vy;
+            c.vy += 0.35; // 중력
+            c.life--;
+            ctx.fillStyle = c.color;
+            ctx.fillRect(c.x, c.y, c.size, c.size * 0.6);
+            alive = true;
+          }
+        }
+        if (alive) {
+          requestAnimationFrame(update);
+        } else {
+          canvas.remove();
+        }
+      }
+      requestAnimationFrame(update);
+    }
+
+    /**
+     * =========================================================================
+     * [섹션 1 & 메인 앱 구동] DOM 이벤트 바인딩 및 메인 루프
+     * =========================================================================
+     */
+    window.addEventListener('DOMContentLoaded', () => {
+      const worldCanvas = document.getElementById('world-canvas');
+      const chartCanvas = document.getElementById('chart-canvas');
+      const pyramidCanvas = document.getElementById('pyramid-canvas');
+
+      // 캔버스 크기 초기화 함수
+      function resizeCanvases() {
+        const wRect = worldCanvas.parentElement.getBoundingClientRect();
+        worldCanvas.width = wRect.width;
+        worldCanvas.height = wRect.height;
+        if (world) world.resize(wRect.width, wRect.height);
+
+        const cRect = chartCanvas.parentElement.getBoundingClientRect();
+        chartCanvas.width = cRect.width;
+        chartCanvas.height = cRect.height;
+
+        const pRect = pyramidCanvas.parentElement.getBoundingClientRect();
+        pyramidCanvas.width = pRect.width;
+        pyramidCanvas.height = pRect.height;
+      }
+
+      const world = new EcosystemWorld(800, 600);
+      const worldRenderer = new WorldRenderer(worldCanvas, world);
+      const chartRenderer = new TimeChartRenderer(chartCanvas, world);
+      const pyramidRenderer = new PyramidRenderer(pyramidCanvas, world);
+      const missionManager = new MissionManager(world);
+
+      window.addEventListener('resize', resizeCanvases);
+      resizeCanvases();
+
+      // UI 상태 변수
+      let isPaused = false;
+      let timeSpeed = 1.0;
+      let activeBrush = 'select'; // 'select', 'grass', 'rabbit', 'fox', 'erase'
+      let isMouseDown = false;
+
+      // 브러시 버튼 바인딩
+      const brushBtns = document.querySelectorAll('.btn-brush');
+      brushBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          brushBtns.forEach(b => {
+            b.classList.remove('bg-emerald-600', 'text-white', 'shadow-sm', 'active');
+            b.classList.add('text-slate-700');
+          });
+          btn.classList.add('bg-emerald-600', 'text-white', 'shadow-sm', 'active');
+          btn.classList.remove('text-slate-700');
+          activeBrush = btn.dataset.brush;
+
+          if (activeBrush !== 'select') {
+            world.selectedEntity = null;
+            document.getElementById('inspector-hud').classList.add('hidden');
+          }
+        });
+      });
+
+      // 배속 버튼 바인딩
+      const speedBtns = document.querySelectorAll('.btn-speed');
+      speedBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          speedBtns.forEach(b => {
+            b.classList.remove('bg-white', 'text-emerald-700', 'shadow-sm');
+            b.classList.add('text-slate-600');
+          });
+          btn.classList.add('bg-white', 'text-emerald-700', 'shadow-sm');
+          btn.classList.remove('text-slate-600');
+          timeSpeed = parseFloat(btn.dataset.speed);
+        });
+      });
+
+      // 일시정지 / 재생
+      const pauseBtn = document.getElementById('btn-pause-play');
+      pauseBtn.addEventListener('click', () => {
+        isPaused = !isPaused;
+        pauseBtn.innerText = isPaused ? '▶️' : '⏸️';
+        pauseBtn.className = isPaused ? 'w-8 h-8 rounded-lg bg-amber-500 hover:bg-amber-600 text-white flex items-center justify-center transition shadow-sm font-bold text-sm' : 'w-8 h-8 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center transition shadow-sm font-bold text-sm';
+      });
+
+      window.addEventListener('keydown', (e) => {
+        if (e.code === 'Space' && e.target.tagName !== 'INPUT') {
+          e.preventDefault();
+          pauseBtn.click();
+        }
+      });
+
+      // 사운드 토글
+      const soundBtn = document.getElementById('btn-sound-toggle');
+      soundBtn.addEventListener('click', () => {
+        sfx.muted = !sfx.muted;
+        soundBtn.innerText = sfx.muted ? '🔇' : '🔊';
+        soundBtn.title = sfx.muted ? '소리 켜기' : '소리 끄기';
+      });
+
+      // 리셋 버튼
+      document.getElementById('btn-reset-world').addEventListener('click', () => {
+        if (confirm('생태계를 초기 상태로 다시 시작하시겠습니까?')) {
+          world.initDefaultEcosystem();
+        }
+      });
+
+      // 환경 재해 트리거 버튼들
+      document.getElementById('btn-trigger-drought').addEventListener('click', () => {
+        world.sunlight = 0.2;
+        document.getElementById('param-sunlight').value = 0.2;
+        document.getElementById('label-sunlight').innerText = '가뭄 (0.2x)';
+        world.addEventMarker('☀️ 가뭄 발생');
+        sfx.playRumble();
+      });
+
+      document.getElementById('btn-trigger-rain').addEventListener('click', () => {
+        world.sunlight = 2.0;
+        document.getElementById('param-sunlight').value = 2.0;
+        document.getElementById('label-sunlight').innerText = '단비 촉촉 (2.0x)';
+        // 빗방울 파티클 추가
+        for (let i = 0; i < 20; i++) {
+          world.grass.push(new Grass(
+            Math.random() * world.width,
+            Math.random() * world.height,
+            0.6
+          ));
+        }
+        world.addEventMarker('🌧️ 단비 공급');
+        sfx.playEatGrass();
+      });
+
+      document.getElementById('btn-trigger-plague').addEventListener('click', () => {
+        world.foxes = [];
+        world.addEventMarker('🏹 포식자 전량 포획');
+        sfx.playAlarm();
+      });
+
+      // 탭 전환 (꺾은선 차트 vs 피라미드)
+      const tabChart = document.getElementById('tab-btn-chart');
+      const tabPyramid = document.getElementById('tab-btn-pyramid');
+      const chartView = document.getElementById('chart-view');
+      const pyramidView = document.getElementById('pyramid-view');
+
+      tabChart.addEventListener('click', () => {
+        tabChart.classList.add('bg-white', 'text-slate-800', 'shadow-sm');
+        tabChart.classList.remove('text-slate-600');
+        tabPyramid.classList.remove('bg-white', 'text-slate-800', 'shadow-sm');
+        tabPyramid.classList.add('text-slate-600');
+        chartView.classList.remove('hidden');
+        pyramidView.classList.add('hidden');
+        pyramidView.classList.remove('flex');
+      });
+
+      tabPyramid.addEventListener('click', () => {
+        tabPyramid.classList.add('bg-white', 'text-slate-800', 'shadow-sm');
+        tabPyramid.classList.remove('text-slate-600');
+        tabChart.classList.remove('bg-white', 'text-slate-800', 'shadow-sm');
+        tabChart.classList.add('text-slate-600');
+        chartView.classList.add('hidden');
+        pyramidView.classList.remove('hidden');
+        pyramidView.classList.add('flex');
+      });
+
+      // 슬라이더 바인딩
+      const pSunlight = document.getElementById('param-sunlight');
+      pSunlight.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        world.sunlight = val;
+        document.getElementById('label-sunlight').innerText = val < 0.6 ? `가뭄 (${val}x)` : val > 1.5 ? `비옥 (${val}x)` : `보통 (${val}x)`;
+      });
+
+      const pMaxGrass = document.getElementById('param-max-grass');
+      pMaxGrass.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value);
+        world.maxGrassCount = val;
+        document.getElementById('label-max-grass').innerText = `${val}개`;
+      });
+
+      const pRabbitMetabolism = document.getElementById('param-rabbit-metabolism');
+      pRabbitMetabolism.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        world.rabbitMetabolism = val;
+        document.getElementById('label-rabbit-metabolism').innerText = `${val}x`;
+      });
+
+      const pFoxSpeed = document.getElementById('param-fox-speed');
+      pFoxSpeed.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        world.foxSpeed = val;
+        document.getElementById('label-fox-speed').innerText = `${val} px/f`;
+      });
+
+      document.getElementById('btn-reset-params').addEventListener('click', () => {
+        world.sunlight = 1.0;
+        pSunlight.value = 1.0;
+        document.getElementById('label-sunlight').innerText = '보통 (1.0x)';
+
+        world.maxGrassCount = 240;
+        pMaxGrass.value = 240;
+        document.getElementById('label-max-grass').innerText = '240개';
+
+        world.rabbitMetabolism = 1.0;
+        pRabbitMetabolism.value = 1.0;
+        document.getElementById('label-rabbit-metabolism').innerText = '표준 (1.0x)';
+
+        world.foxSpeed = 2.6;
+        pFoxSpeed.value = 2.6;
+        document.getElementById('label-fox-speed').innerText = '표준 (2.6 px/f)';
+      });
+
+      // 미션 버튼 바인딩
+      document.getElementById('btn-start-mission-1').addEventListener('click', () => missionManager.startMission(1));
+      document.getElementById('btn-start-mission-2').addEventListener('click', () => missionManager.startMission(2));
+      document.getElementById('btn-start-mission-3').addEventListener('click', () => missionManager.startMission(3));
+
+      // 도움말 모달
+      const helpModal = document.getElementById('modal-help');
+      document.getElementById('btn-open-help').addEventListener('click', () => helpModal.classList.remove('hidden'));
+      document.getElementById('btn-close-help').addEventListener('click', () => helpModal.classList.add('hidden'));
+      document.getElementById('btn-confirm-help').addEventListener('click', () => helpModal.classList.add('hidden'));
+
+      // 퀴즈 모달
+      const quizModal = document.getElementById('modal-quiz');
+      const quizOptions = document.querySelectorAll('.quiz-option');
+      const quizFeedback = document.getElementById('quiz-feedback');
+      const quizNextBtn = document.getElementById('btn-next-quiz');
+
+      quizOptions.forEach(opt => {
+        opt.addEventListener('click', () => {
+          const ans = opt.dataset.answer;
+          if (ans === '2') {
+            opt.classList.add('bg-emerald-50', 'border-emerald-500', 'text-emerald-900');
+            quizFeedback.innerHTML = '🎉 <strong>정답입니다!</strong><br/>늑대나 여우 같은 상위 포식자가 사라지면 초식동물(사슴/토끼)이 일시적으로 급증하지만, 결국 식물 먹이가 고갈되어 초원이 사막화되고 대량 아사로 이어집니다. 생태계의 모든 생물은 서로 긴밀하게 연결되어 있음을 알 수 있습니다.';
+            quizFeedback.className = 'p-3 rounded-xl text-xs font-medium bg-emerald-100 text-emerald-800 border border-emerald-300';
+            quizFeedback.classList.remove('hidden');
+            quizNextBtn.classList.remove('hidden');
+            sfx.playFanfare();
+          } else {
+            opt.classList.add('bg-rose-50', 'border-rose-300', 'text-rose-800');
+            quizFeedback.innerHTML = '❌ <strong>다시 생각해보세요!</strong><br/>포식자가 사라지면 초식동물의 수가 어떻게 변하고, 그 초식동물들이 먹는 풀은 어떻게 될지 단계별로 상상해보세요.';
+            quizFeedback.className = 'p-3 rounded-xl text-xs font-medium bg-rose-100 text-rose-800 border border-rose-300';
+            quizFeedback.classList.remove('hidden');
+          }
+        });
+      });
+
+      document.getElementById('btn-close-quiz').addEventListener('click', () => quizModal.classList.add('hidden'));
+      quizNextBtn.addEventListener('click', () => {
+        quizModal.classList.add('hidden');
+        missionManager.completeMission(2, '미션 2 달성: 카이바브 고원의 교훈 습득!', '포식자의 역할과 생태계 먹이그물의 중요성을 성공적으로 이해했습니다.');
+      });
+
+      document.getElementById('btn-success-close').addEventListener('click', () => {
+        document.getElementById('modal-mission-success').classList.add('hidden');
+      });
+
+      // HUD 닫기 및 개체 삭제
+      document.getElementById('hud-close').addEventListener('click', () => {
+        world.selectedEntity = null;
+        document.getElementById('inspector-hud').classList.add('hidden');
+      });
+
+      document.getElementById('hud-remove-btn').addEventListener('click', () => {
+        if (world.selectedEntity) {
+          world.selectedEntity.alive = false;
+          world.selectedEntity = null;
+          document.getElementById('inspector-hud').classList.add('hidden');
+        }
+      });
+
+      // 캔버스 인터랙션 (마우스 / 터치)
+      function handleCanvasAction(clientX, clientY) {
+        const rect = worldCanvas.getBoundingClientRect();
+        const x = clientX - rect.left;
+        const y = clientY - rect.top;
+
+        if (activeBrush === 'select') {
+          // 클릭한 위치에 가장 가까운 토끼 또는 여우 찾기
+          let found = null;
+          let minDist = 30;
+
+          // 여우 먼저 확인
+          for (let i = 0; i < world.foxes.length; i++) {
+            const f = world.foxes[i];
+            const d = f.pos.dist(new Vec2(x, y));
+            if (d < minDist) {
+              minDist = d;
+              found = f;
+            }
+          }
+          // 토끼 확인
+          for (let i = 0; i < world.rabbits.length; i++) {
+            const r = world.rabbits[i];
+            const d = r.pos.dist(new Vec2(x, y));
+            if (d < minDist) {
+              minDist = d;
+              found = r;
+            }
+          }
+
+          world.selectedEntity = found;
+          if (found) {
+            document.getElementById('inspector-hud').classList.remove('hidden');
+          } else {
+            document.getElementById('inspector-hud').classList.add('hidden');
+          }
+        } else if (activeBrush === 'grass') {
+          world.grass.push(new Grass(x + (Math.random() - 0.5) * 15, y + (Math.random() - 0.5) * 15, 0.5));
+          sfx.playEatGrass();
+        } else if (activeBrush === 'rabbit') {
+          world.rabbits.push(new Rabbit(x, y));
+          sfx.playBirth();
+        } else if (activeBrush === 'fox') {
+          world.foxes.push(new Fox(x, y));
+          sfx.playBirth();
+        } else if (activeBrush === 'erase') {
+          // 40px 반경 내 개체 삭제
+          const p = new Vec2(x, y);
+          world.grass = world.grass.filter(g => g.pos.dist(p) > 35);
+          world.rabbits = world.rabbits.filter(r => r.pos.dist(p) > 35);
+          world.foxes = world.foxes.filter(f => f.pos.dist(p) > 35);
+        }
+      }
+
+      worldCanvas.addEventListener('mousedown', (e) => {
+        isMouseDown = true;
+        sfx.resume();
+        handleCanvasAction(e.clientX, e.clientY);
+      });
+
+      worldCanvas.addEventListener('mousemove', (e) => {
+        if (isMouseDown && activeBrush !== 'select') {
+          handleCanvasAction(e.clientX, e.clientY);
+        }
+      });
+
+      window.addEventListener('mouseup', () => {
+        isMouseDown = false;
+      });
+
+      // 터치 이벤트 지원 (태블릿/스마트패드)
+      worldCanvas.addEventListener('touchstart', (e) => {
+        if (e.touches.length > 0) {
+          isMouseDown = true;
+          sfx.resume();
+          handleCanvasAction(e.touches[0].clientX, e.touches[0].clientY);
+        }
+      }, { passive: false });
+
+      worldCanvas.addEventListener('touchmove', (e) => {
+        if (isMouseDown && activeBrush !== 'select' && e.touches.length > 0) {
+          handleCanvasAction(e.touches[0].clientX, e.touches[0].clientY);
+        }
+      }, { passive: false });
+
+      worldCanvas.addEventListener('touchend', () => {
+        isMouseDown = false;
+      });
+
+      // HUD 업데이트 루틴
+      function updateHUD() {
+        const hud = document.getElementById('inspector-hud');
+        if (!world.selectedEntity || !world.selectedEntity.alive) {
+          hud.classList.add('hidden');
+          return;
+        }
+
+        const ent = world.selectedEntity;
+        document.getElementById('hud-icon').innerText = ent.species === 'fox' ? '🦊' : '🐇';
+        document.getElementById('hud-name').innerText = (ent.species === 'fox' ? '붉은여우 #' : '초원토끼 #') + ent.id;
+        document.getElementById('hud-state').innerText = ent.statusText;
+
+        const energyPct = Math.max(0, Math.min(100, (ent.energy / ent.maxEnergy) * 100));
+        const bar = document.getElementById('hud-energy-bar');
+        bar.style.width = `${energyPct}%`;
+        bar.className = energyPct < 30 ? 'bg-rose-500 h-full rounded-full transition-all' : energyPct < 60 ? 'bg-amber-500 h-full rounded-full transition-all' : 'bg-emerald-500 h-full rounded-full transition-all';
+
+        document.getElementById('hud-age').innerText = `${ent.age.toFixed(1)}초`;
+        document.getElementById('hud-speed').innerText = `${ent.vel.mag().toFixed(1)} px/f`;
+        document.getElementById('hud-offspring').innerText = `${ent.offspringCount}마리 번식`;
+      }
+
+      // ==========================================
+      // 메인 60FPS 애니메이션 루프
+      // ==========================================
+      let lastTime = performance.now();
+
+      function gameLoop(now) {
+        const deltaMs = now - lastTime;
+        lastTime = now;
+        // 비정상적인 큰 delta 방지 (탭 전환 등)
+        const dt = Math.min(deltaMs / 1000, 0.1) * (isPaused ? 0 : timeSpeed);
+
+        // 시뮬레이션 및 미션 갱신
+        if (dt > 0) {
+          world.update(dt);
+          missionManager.update(dt);
+        }
+
+        // 렌더링
+        worldRenderer.draw();
+        chartRenderer.draw();
+        pyramidRenderer.draw();
+        updateHUD();
+
+        // 상단 뱃지 카운터 갱신
+        document.getElementById('badge-grass-count').innerText = world.grass.length;
+        document.getElementById('badge-rabbit-count').innerText = world.rabbits.length;
+        document.getElementById('badge-fox-count').innerText = world.foxes.length;
+
+        // 시뮬레이션 타이머 텍스트 (mm:ss) 및 일차
+        const totalSec = Math.floor(world.simTime);
+        const mins = String(Math.floor(totalSec / 60)).padStart(2, '0');
+        const secs = String(totalSec % 60).padStart(2, '0');
+        document.getElementById('sim-timer-text').innerText = `${mins}:${secs}`;
+        const days = Math.floor(totalSec / 15) + 1; // 15초를 가상의 1일로 책정
+        document.getElementById('sim-day-text').innerText = `${days}일차`;
+
+        requestAnimationFrame(gameLoop);
+      }
+
+      requestAnimationFrame(gameLoop);
+    });
+  </script>
+</body>
+</html>
